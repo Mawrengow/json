@@ -1,14 +1,20 @@
 {
-  "name": "POC: AI Agent met Groq en Google Sheets",
+  "meta": {
+    "instanceId": "n8n-local"
+  },
+  "name": "POC AI Agent Groq + Google Sheets",
   "nodes": [
     {
       "parameters": {},
-      "id": "chat-trigger-001",
+      "id": "f7b3c4d1-2e6a-4b9c-8f1d-3e5a7b9c1d2e",
       "name": "Chat Trigger",
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-      "position": [500, 300],
-      "webhookId": "groq-poc-chat",
-      "typeVersion": 1
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ],
+      "webhookId": "groq-poc-chat"
     },
     {
       "parameters": {
@@ -19,64 +25,79 @@
           "maxTokens": 1000
         }
       },
-      "id": "groq-model-001",
+      "id": "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
       "name": "Groq LLM",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "position": [400, 500],
-      "typeVersion": 1
+      "typeVersion": 1,
+      "position": [
+        400,
+        500
+      ]
     },
     {
       "parameters": {
         "sessionIdType": "fixed",
         "sessionId": "groq-session"
       },
-      "id": "memory-001",
-      "name": "Conversation Memory",
+      "id": "b2c3d4e5-6f7g-8h9i-0j1k-l2m3n4o5p6q7",
+      "name": "Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
-      "position": [600, 500],
-      "typeVersion": 1.1
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        500
+      ]
     },
     {
       "parameters": {
         "text": "={{ $json.chatInput }}",
         "options": {
           "maxIterations": 5,
-          "systemMessage": "Je bent een AI assistent die prijsberekeningen kan maken op basis van data uit een Google Sheet. Je hebt toegang tot tools om data op te halen en berekeningen te maken. Antwoord altijd in het Nederlands."
+          "systemMessage": "Je bent een AI assistent die prijsberekeningen kan maken op basis van data uit een Google Sheet. Je hebt toegang tot tools om data op te halen. Antwoord in het Nederlands."
         }
       },
-      "id": "ai-agent-001",
+      "id": "c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8",
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "position": [700, 300],
-      "typeVersion": 1.1
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        300
+      ]
     },
     {
       "parameters": {
-        "name": "google_sheets_reader",
-        "description": "Haalt alle data op uit de Google Sheet. Gebruik dit om prijsinformatie en productdata te bekijken.",
+        "name": "sheets_tool",
+        "description": "Haalt data op uit Google Sheet voor prijsberekeningen",
         "workflowId": "={{ $workflow.id }}",
         "fields": {
           "values": [
             {
               "name": "operation",
-              "stringValue": "read_all_data"
+              "stringValue": "read_sheet"
             }
           ]
         }
       },
-      "id": "sheets-tool-001",
+      "id": "d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9",
       "name": "Google Sheets Tool",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "position": [500, 500],
-      "typeVersion": 1
+      "typeVersion": 1,
+      "position": [
+        500,
+        500
+      ]
     },
     {
       "parameters": {},
-      "id": "sub-workflow-trigger",
+      "id": "e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "position": [300, 800],
-      "typeVersion": 1
+      "typeVersion": 1,
+      "position": [
+        300,
+        800
+      ]
     },
     {
       "parameters": {
@@ -90,18 +111,21 @@
         },
         "options": {}
       },
-      "id": "set-sheet-url",
-      "name": "Set Google Sheet URL",
+      "id": "f6g7h8i9-0j1k-2l3m-4n5o-p6q7r8s9t0u1",
+      "name": "Set Sheet URL",
       "type": "n8n-nodes-base.set",
-      "position": [500, 800],
-      "typeVersion": 3.2
+      "typeVersion": 3.2,
+      "position": [
+        500,
+        800
+      ]
     },
     {
       "parameters": {
         "authentication": "serviceAccount",
         "documentId": {
           "__rl": true,
-          "mode": "url", 
+          "mode": "url",
           "value": "={{ $json.sheetUrl }}"
         },
         "sheetName": {
@@ -111,21 +135,27 @@
         },
         "options": {}
       },
-      "id": "google-sheets-read",
-      "name": "Read Google Sheet",
+      "id": "g7h8i9j0-1k2l-3m4n-5o6p-q7r8s9t0u1v2",
+      "name": "Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
-      "position": [700, 800],
-      "typeVersion": 4.2
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        800
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Formateer de sheet data voor de AI\nconst sheetData = $input.all().map(item => item.json);\n\n// Maak een samenvatting van de beschikbare data\nconst summary = {\n  totalRows: sheetData.length,\n  columns: Object.keys(sheetData[0] || {}),\n  sampleData: sheetData.slice(0, 3), // Eerste 3 rijen als voorbeeld\n  fullData: sheetData\n};\n\nreturn {\n  response: JSON.stringify(summary, null, 2)\n};"
+        "jsCode": "const sheetData = $input.all().map(item => item.json);\n\nconst result = {\n  totalRows: sheetData.length,\n  columns: Object.keys(sheetData[0] || {}),\n  data: sheetData\n};\n\nreturn {\n  response: JSON.stringify(result, null, 2)\n};"
       },
-      "id": "format-data",
-      "name": "Format Sheet Data",
+      "id": "h8i9j0k1-2l3m-4n5o-6p7q-r8s9t0u1v2w3",
+      "name": "Format Data",
       "type": "n8n-nodes-base.code",
-      "position": [900, 800],
-      "typeVersion": 2
+      "typeVersion": 2,
+      "position": [
+        900,
+        800
+      ]
     }
   ],
   "connections": {
@@ -151,7 +181,7 @@
         ]
       ]
     },
-    "Conversation Memory": {
+    "Memory": {
       "ai_memory": [
         [
           {
@@ -177,29 +207,29 @@
       "main": [
         [
           {
-            "node": "Set Google Sheet URL",
+            "node": "Set Sheet URL",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Set Google Sheet URL": {
+    "Set Sheet URL": {
       "main": [
         [
           {
-            "node": "Read Google Sheet",
+            "node": "Google Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Google Sheet": {
+    "Google Sheets": {
       "main": [
         [
           {
-            "node": "Format Sheet Data",
+            "node": "Format Data",
             "type": "main",
             "index": 0
           }
@@ -207,13 +237,13 @@
       ]
     }
   },
-  "pinData": {},
+  "createdAt": "2025-06-10T10:00:00.000Z",
+  "updatedAt": "2025-06-10T10:00:00.000Z",
   "settings": {
     "executionOrder": "v1"
   },
   "staticData": {},
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2025-06-10T00:00:00.000Z",
-  "versionId": "poc-v1"
+  "versionId": "1"
 }
