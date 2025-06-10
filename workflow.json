@@ -1,106 +1,219 @@
 {
-  "name": "Autosleutel POC",
+  "name": "POC: AI Agent met Groq en Google Sheets",
   "nodes": [
     {
+      "parameters": {},
+      "id": "chat-trigger-001",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [500, 300],
+      "webhookId": "groq-poc-chat",
+      "typeVersion": 1
+    },
+    {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "autosleutels",
+        "baseURL": "https://api.groq.com/openai/v1",
+        "model": "llama3-70b-8192",
         "options": {
-          "responseData": "firstEntryJson",
-          "responseContentType": "application/json",
-          "responseCode": 200
+          "temperature": 0.1,
+          "maxTokens": 1000
         }
       },
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [250, 300]
+      "id": "groq-model-001",
+      "name": "Groq LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [400, 500],
+      "typeVersion": 1
     },
     {
       "parameters": {
-        "filePath": "Auto Sleutels Database (1).csv"
+        "sessionIdType": "fixed",
+        "sessionId": "groq-session"
       },
-      "name": "Read CSV",
-      "type": "n8n-nodes-base.readBinaryFile",
-      "typeVersion": 1,
-      "position": [450, 300]
+      "id": "memory-001",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [600, 500],
+      "typeVersion": 1.1
     },
     {
       "parameters": {
-        "fileFormat": "csv",
-        "binaryPropertyName": "data",
-        "delimiter": ",",
-        "headerRow": true
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "maxIterations": 5,
+          "systemMessage": "Je bent een AI assistent die prijsberekeningen kan maken op basis van data uit een Google Sheet. Je hebt toegang tot tools om data op te halen en berekeningen te maken. Antwoord altijd in het Nederlands."
+        }
       },
-      "name": "Parse CSV",
-      "type": "n8n-nodes-base.spreadsheetFile",
-      "typeVersion": 1,
-      "position": [650, 300]
+      "id": "ai-agent-001",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [700, 300],
+      "typeVersion": 1.1
     },
     {
       "parameters": {
-        "functionCode": "// input uit Webhook: items[0].json\n// CSV-data in items[1].json\nconst input = items[0].json;\nconst rows = items[1].json;\nconst jaar = parseInt(input.year, 10);\n\n// lookup op merk/model/bouwjaar\nconst entry = rows.find(d => \n  d.merk === input.merk &&\n  d.model === input.model &&\n  jaar >= parseInt(d.minYear, 10) &&\n  jaar <= parseInt(d.maxYear, 10)\n);\n\nlet output = {};\nif (!entry) {\n  output.error = `Geen data voor ${input.merk} ${input.model} (${jaar})`;\n} else {\n  let priceCell;\n  if (input.reason === 'lost')        priceCell = entry.lostPrice;\n  else if (input.reason === 'remote') priceCell = entry.remotePrice;\n  else if (input.reason === 'noRemote') priceCell = entry.noRemotePrice;\n\n  if (priceCell === '--' || priceCell === '—' || priceCell == null) {\n    output.message = 'Niet beschikbaar voor deze combinatie.';\n  } else if (typeof priceCell === 'string') {\n    output.message = priceCell;\n  } else {\n    output.message = `Totaalprijs: €${priceCell}`;\n    output.totaalPrijs = priceCell;\n  }\n}\nreturn [{ json: output }];"
+        "name": "google_sheets_reader",
+        "description": "Haalt alle data op uit de Google Sheet. Gebruik dit om prijsinformatie en productdata te bekijken.",
+        "workflowId": "={{ $workflow.id }}",
+        "fields": {
+          "values": [
+            {
+              "name": "operation",
+              "stringValue": "read_all_data"
+            }
+          ]
+        }
       },
-      "name": "Lookup Price",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [850, 300]
+      "id": "sheets-tool-001",
+      "name": "Google Sheets Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [500, 500],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "sub-workflow-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [300, 800],
+      "typeVersion": 1
     },
     {
       "parameters": {
-        "responseMode": "lastNode",
-        "responseData": "firstEntryJson"
+        "fields": {
+          "values": [
+            {
+              "name": "sheetUrl",
+              "stringValue": "JOUW_GOOGLE_SHEET_URL_HIER"
+            }
+          ]
+        },
+        "options": {}
       },
-      "name": "HTTP Response",
-      "type": "n8n-nodes-base.httpResponse",
-      "typeVersion": 1,
-      "position": [1050, 300]
+      "id": "set-sheet-url",
+      "name": "Set Google Sheet URL",
+      "type": "n8n-nodes-base.set",
+      "position": [500, 800],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "url", 
+          "value": "={{ $json.sheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.sheetUrl }}"
+        },
+        "options": {}
+      },
+      "id": "google-sheets-read",
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [700, 800],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Formateer de sheet data voor de AI\nconst sheetData = $input.all().map(item => item.json);\n\n// Maak een samenvatting van de beschikbare data\nconst summary = {\n  totalRows: sheetData.length,\n  columns: Object.keys(sheetData[0] || {}),\n  sampleData: sheetData.slice(0, 3), // Eerste 3 rijen als voorbeeld\n  fullData: sheetData\n};\n\nreturn {\n  response: JSON.stringify(summary, null, 2)\n};"
+      },
+      "id": "format-data",
+      "name": "Format Sheet Data",
+      "type": "n8n-nodes-base.code",
+      "position": [900, 800],
+      "typeVersion": 2
     }
   ],
   "connections": {
-    "Webhook": {
+    "Chat Trigger": {
       "main": [
         [
           {
-            "node": "Read CSV",
+            "node": "AI Agent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read CSV": {
+    "Groq LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
       "main": [
         [
           {
-            "node": "Parse CSV",
+            "node": "Set Google Sheet URL",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse CSV": {
+    "Set Google Sheet URL": {
       "main": [
         [
           {
-            "node": "Lookup Price",
+            "node": "Read Google Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Lookup Price": {
+    "Read Google Sheet": {
       "main": [
         [
           {
-            "node": "HTTP Response",
+            "node": "Format Sheet Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {},
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-10T00:00:00.000Z",
+  "versionId": "poc-v1"
 }
