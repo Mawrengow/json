@@ -1,0 +1,106 @@
+{
+  "name": "Autosleutel POC",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "autosleutels",
+        "options": {
+          "responseData": "firstEntryJson",
+          "responseContentType": "application/json",
+          "responseCode": 200
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "filePath": "Auto Sleutels Database (1).csv"
+      },
+      "name": "Read CSV",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "fileFormat": "csv",
+        "binaryPropertyName": "data",
+        "delimiter": ",",
+        "headerRow": true
+      },
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// input uit Webhook: items[0].json\n// CSV-data in items[1].json\nconst input = items[0].json;\nconst rows = items[1].json;\nconst jaar = parseInt(input.year, 10);\n\n// lookup op merk/model/bouwjaar\nconst entry = rows.find(d => \n  d.merk === input.merk &&\n  d.model === input.model &&\n  jaar >= parseInt(d.minYear, 10) &&\n  jaar <= parseInt(d.maxYear, 10)\n);\n\nlet output = {};\nif (!entry) {\n  output.error = `Geen data voor ${input.merk} ${input.model} (${jaar})`;\n} else {\n  let priceCell;\n  if (input.reason === 'lost')        priceCell = entry.lostPrice;\n  else if (input.reason === 'remote') priceCell = entry.remotePrice;\n  else if (input.reason === 'noRemote') priceCell = entry.noRemotePrice;\n\n  if (priceCell === '--' || priceCell === '—' || priceCell == null) {\n    output.message = 'Niet beschikbaar voor deze combinatie.';\n  } else if (typeof priceCell === 'string') {\n    output.message = priceCell;\n  } else {\n    output.message = `Totaalprijs: €${priceCell}`;\n    output.totaalPrijs = priceCell;\n  }\n}\nreturn [{ json: output }];"
+      },
+      "name": "Lookup Price",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson"
+      },
+      "name": "HTTP Response",
+      "type": "n8n-nodes-base.httpResponse",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CSV": {
+      "main": [
+        [
+          {
+            "node": "Parse CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CSV": {
+      "main": [
+        [
+          {
+            "node": "Lookup Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Price": {
+      "main": [
+        [
+          {
+            "node": "HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
